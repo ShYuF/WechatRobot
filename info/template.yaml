@@ -1,0 +1,25 @@
+# ai设定的模板
+template:
+  # 这里是角色的初始设定
+  initial:
+    - role: "user"
+      # 在这里添加设定（用英文引号扩住，\n表示换行，没有\n时也可以多行输入，但是视为一行）
+      content: ""
+    - role: "assistant"
+      # 写一句符合设定的ai的回答
+      content: ""
+  
+  # 输入屏蔽内容时的回复（通常不会触发）
+  error_input: ""
+
+  # 输入为空时的回复（通常指被@但没有其它输入）
+  null_input: ""
+
+  # ai启动时的测试输出
+  greet: ""
+
+  # ddl模块-无最近ddl的输出
+  special_ddl: ""
+
+  # 查询类模块查询失败的输出
+  special_error: ""
