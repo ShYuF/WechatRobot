@@ -13,18 +13,11 @@ from wcferry import Wcf
 
 from base.func_weather import weather
 
+
 role_info_path = r"info\roles.yaml"
 file = open(role_info_path, "r", encoding="utf-8")
 roles = yaml.safe_load(file.read())
 file.close()
-
-key_info_path = r"info\ddlkey.yaml"
-file_d = open(key_info_path, "r", encoding="utf-8")
-ddlkey = yaml.safe_load(file_d.read())
-file_d.close()
-
-keyword = "dog"
-role = roles[keyword]
 
 
 def weather_report(robot: Robot) -> None:
@@ -38,7 +31,7 @@ def weather_report(robot: Robot) -> None:
         # robot.sendTextMsg(report, r, "notify@all")   # 发送消息并@所有人
 
 
-def main(chat_type: int):
+def main():
     config = Config()
     wcf = Wcf(debug=True)
 
@@ -48,12 +41,9 @@ def main(chat_type: int):
 
     signal.signal(signal.SIGINT, handler)
 
-    robot = Robot(config, wcf, chat_type, role, ddlkey)
+    robot = Robot(config, wcf, roles=roles, keyword="default")
     robot.LOG.info(f"WeChatRobot【{__version__}】成功启动···")
 
-    # 机器人启动发送测试消息
-    robot.sendTextMsg("机器人启动成功！", "filehelper")
-    robot.sendTextMsg(role["greet"], "wxid_bslrmqx7wofq22")
     # 接收消息
     # robot.enableRecvMsg()     # 可能会丢消息？
     robot.enableReceivingMsg()  # 加队列
@@ -72,7 +62,4 @@ def main(chat_type: int):
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser()
-    parser.add_argument('-c', type=int, default=0, help=f'选择模型参数序号: {ChatType.help_hint()}')
-    args = parser.parse_args().c
-    main(args)
+    main()

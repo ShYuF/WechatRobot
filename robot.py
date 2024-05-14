@@ -32,60 +32,50 @@ class Robot(Job):
     """个性化自己的机器人
     """
 
-    def __init__(self, config: Config, wcf: Wcf, chat_type: int, role: dict, ddlkey: dict) -> None:
+    def __init__(self, config: Config, wcf: Wcf, roles: dict, keyword: str = "default") -> None:
         self.wcf = wcf
         self.config = config
-        self.role = role.copy()
-        self.ddlkey = ddlkey.copy()
+
+        self.roles = roles.copy()
+        self.keyword = keyword
+        self.admin = "wxid_bslrmqx7wofq22"
+        
         self.LOG = logging.getLogger("Robot")
         self.wxid = self.wcf.get_self_wxid()
         self.allContacts = self.getAllContacts()
 
-        # 锁定机器人
-        # self.lock = False
-        # self.lockid = 0
-        # self.lockkey = 0
+        # if ChatType.is_in_chat_types(chat_type):
+        #     if chat_type == ChatType.TIGER_BOT.value and TigerBot.value_check(self.config.TIGERBOT):
+        #         self.chat = TigerBot(self.config.TIGERBOT)
+        #     elif chat_type == ChatType.CHATGPT.value and ChatGPT.value_check(self.config.CHATGPT):
+        #         self.chat = ChatGPT(self.config.CHATGPT)
+        #     elif chat_type == ChatType.XINGHUO_WEB.value and XinghuoWeb.value_check(self.config.XINGHUO_WEB):
+        #         self.chat = XinghuoWeb(self.config.XINGHUO_WEB)
+        #     elif chat_type == ChatType.ZhiPu.value and ZhiPu.value_check(self.config.ZHIPU):
+        #         self.chat = ZhiPu(self.config.ZHIPU, role)
+        #     elif chat_type == ChatType.CHATGLM.value and ChatGLM.value_check(self.config.CHATGLM):
+        #         self.chat = ChatGLM(self.config.CHATGLM)
+        #     elif chat_type == ChatType.BardAssistant.value and BardAssistant.value_check(self.config.BardAssistant):
+        #         self.chat = BardAssistant(self.config.BardAssistant)
+        #     else:
+        #         self.LOG.warning("未配置模型")
+        #         self.chat = None
 
-        if ChatType.is_in_chat_types(chat_type):
-            if chat_type == ChatType.TIGER_BOT.value and TigerBot.value_check(self.config.TIGERBOT):
-                self.chat = TigerBot(self.config.TIGERBOT)
-            elif chat_type == ChatType.CHATGPT.value and ChatGPT.value_check(self.config.CHATGPT):
-                self.chat = ChatGPT(self.config.CHATGPT)
-            elif chat_type == ChatType.XINGHUO_WEB.value and XinghuoWeb.value_check(self.config.XINGHUO_WEB):
-                self.chat = XinghuoWeb(self.config.XINGHUO_WEB)
-            elif chat_type == ChatType.ZhiPu.value and ZhiPu.value_check(self.config.ZHIPU):
-                self.chat = ZhiPu(self.config.ZHIPU, role)
-            elif chat_type == ChatType.CHATGLM.value and ChatGLM.value_check(self.config.CHATGLM):
-                self.chat = ChatGLM(self.config.CHATGLM)
-            elif chat_type == ChatType.BardAssistant.value and BardAssistant.value_check(self.config.BardAssistant):
-                self.chat = BardAssistant(self.config.BardAssistant)
-            else:
-                self.LOG.warning("未配置模型")
-                self.chat = None
-        else:
-            # if TigerBot.value_check(self.config.TIGERBOT):
-            #     self.chat = TigerBot(self.config.TIGERBOT)
-            # elif ChatGPT.value_check(self.config.CHATGPT):
-            #     self.chat = ChatGPT(self.config.CHATGPT)
-            # elif XinghuoWeb.value_check(self.config.XINGHUO_WEB):
-            #     self.chat = XinghuoWeb(self.config.XINGHUO_WEB)
-            # elif ChatGLM.value_check(self.config.CHATGLM):
-            #     self.chat = ChatGLM(self.config.CHATGLM)
-            # elif BardAssistant.value_check(self.config.BardAssistant):
-            #     self.chat = BardAssistant(self.config.BardAssistant)
-            if ZhiPu.value_check(self.config.ZhiPu):
-                self.chat = ZhiPu(self.config.ZhiPu, role)
-            else:
-                self.LOG.warning("未配置模型")
-                self.chat = None
+        self.chat = ZhiPu(
+            self.config.ZhiPu,
+            self.roles.get(self.keyword, "default")
+        )
 
         self.LOG.info(f"已选择: {self.chat}")
+        self.sendTextMsg(self.roles.get(self.keyword, "default")["greet"], self.admin)
+
 
     @staticmethod
     def value_check(args: dict) -> bool:
         if args:
             return all(value is not None for key, value in args.items() if key != 'proxy')
         return False
+
 
     def toAt(self, msg: WxMsg) -> bool:
         """处理被 @ 消息
@@ -139,15 +129,16 @@ class Robot(Job):
                 #     self.lockkey = random.randint(1, 65535)
                 #     rsp = "已经锁定了喵~锁定状态码：" + str(self.lockkey)
             if q == "天气":
-                rsp = weather(self.role["special_error"])
+                rsp = weather(self.roles.get(self.keyword, "default")["special_error"])
                 # wea = weather() + "\n根据天气信息写一份该天的天气简报，要求语言简洁，并给出适当的建议，建议中不要提及主体，保持之前设定的说话方式"
                 # rsp = self.chat.get_answer(wea, (msg.roomid if msg.from_group() else msg.sender))
-            elif re.match("ddl\n(\d{10})(\n(.+))?", q) != None:
-                mat = re.match("ddl\n(\d{10})(\n(.+))?", q)
-                if ("p" + mat.group(1) in self.ddlkey.keys()):
-                    rsp = deadline(mat.group(1), self.ddlkey["p" + mat.group(1)], self.role["special_ddl"], self.role["special_error"])
-                else:
-                    rsp = deadline(mat.group(1), mat.group(3), self.role["special_ddl"], self.role["special_error"])
+            elif re.match("ddl\n(\d{10})(\n(.+))", q) != None:
+                mat = re.match("ddl\n(\d{10})(\n(.+))", q)
+                rsp = deadline(mat.group(1),
+                    mat.group(3),
+                    self.roles.get(self.keyword, "default")["special_ddl"],
+                    self.roles.get(self.keyword, "default")["special_error"]
+                )
             else:
                 rsp = self.chat.get_answer(q, (msg.roomid if msg.from_group() else msg.sender))
             # else:
@@ -208,12 +199,27 @@ class Robot(Job):
 
         elif msg.type == 0x01:  # 文本消息
             # 让配置加载更灵活，自己可以更新配置。也可以利用定时任务更新。
-            if msg.from_self():
-                if msg.content == "^更新$":
-                    self.config.reload()
-                    self.LOG.info("已更新")
+            if not msg.from_group():
+                if msg.sender == self.admin:
+                    if msg.content == "$\\clear$":
+                        self.chat = ZhiPu(
+                            self.config.ZhiPu,
+                            self.roles.get(self.keyword, "default")
+                        )
+                    elif re.match(r"\$\\switch (\w+)\$", msg.content) != None:
+                        self.keyword = re.match(r"\$\\switch (\w+)\$", msg.content).group(1) \
+                            if re.match(r"\$\\switch (\w+)\$", msg.content).group(1) in self.roles.keys() \
+                            else "default"
+                        self.chat = ZhiPu(
+                            self.config.ZhiPu,
+                            self.roles.get(self.keyword, "default")
+                        )
+                        self.sendTextMsg(self.roles.get(self.keyword, "default")["greet"], self.admin)
+                    else:
+                        self.toChitchat(msg)
             else:
                 self.toChitchat(msg)  # 闲聊
+
 
     def onMsg(self, msg: WxMsg) -> int:
         try:
@@ -223,6 +229,7 @@ class Robot(Job):
             self.LOG.error(e)
 
         return 0
+
 
     def enableRecvMsg(self) -> None:
         self.wcf.enable_recv_msg(self.onMsg)
