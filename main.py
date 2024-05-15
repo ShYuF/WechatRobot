@@ -22,9 +22,9 @@ file.close()
 
 def weather_report(robot: Robot) -> None:
     # 获取接收人
-    receivers = ["wxid_bslrmqx7wofq22"]
+    receivers = [robot.admin]
 
-    report = weather(robot.role["special_error"])
+    report = weather(robot.roles[robot.keyword]["special_error"])
 
     for r in receivers:
         robot.sendTextMsg(report, r)
