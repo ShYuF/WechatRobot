@@ -121,37 +121,19 @@ class Robot(Job):
             rsp = ""
         else:  # 接了 ChatGPT，智能回复
             q = re.sub(r"@.*?[\u2005|\s]", "", msg.content).replace(" ", "")
-            # if self.lock == False:
-                # if re.match(r"\\lock(\d+)", q) != None:
-                #     mat = re.match(r"\\lock(\d+)", q)
-                #     self.lock = True
-                #     self.lockid = int(mat.group(1))
-                #     self.lockkey = random.randint(1, 65535)
-                #     rsp = "已经锁定了喵~锁定状态码：" + str(self.lockkey)
             if q == "天气":
                 rsp = weather(self.roles.get(self.keyword, "default")["special_error"])
                 # wea = weather() + "\n根据天气信息写一份该天的天气简报，要求语言简洁，并给出适当的建议，建议中不要提及主体，保持之前设定的说话方式"
                 # rsp = self.chat.get_answer(wea, (msg.roomid if msg.from_group() else msg.sender))
-            elif re.match("ddl\n(\d{10})(\n(.+))", q) != None:
-                mat = re.match("ddl\n(\d{10})(\n(.+))", q)
+            elif re.match("ddl\n(\d{10})\n(.+)", q) != None:
+                mat = re.match("ddl\n(\d{10})\n(.+)", q)
                 rsp = deadline(mat.group(1),
-                    mat.group(3),
+                    mat.group(2),
                     self.roles.get(self.keyword, "default")["special_ddl"],
                     self.roles.get(self.keyword, "default")["special_error"]
                 )
             else:
                 rsp = self.chat.get_answer(q, (msg.roomid if msg.from_group() else msg.sender))
-            # else:
-            #     rsp = "已经锁定了喵~"
-            #     if re.match(r"\\unlock(\d+)", q) != None:
-            #         mat = re.match(r"\\unlock(\d+)", q)
-            #         if int(mat.group(1)) == (self.lockid * self.lockkey) % 65536:
-            #             self.lock = False
-            #             self.lockid = 0 
-            #             self.lockkey = 0
-            #             rsp = "已经解锁了喵~"
-            #         else:
-            #             rsp = "密码错误喵~"
 
         if rsp:
             if msg.from_group():
