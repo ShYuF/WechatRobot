@@ -24,6 +24,7 @@ from job_mgmt import Job
 import random
 from base.func_weather import weather
 from base.func_deadline import deadline
+from base.func_alarm import WeatherAlarm
 
 __version__ = "39.0.10.1"
 
@@ -39,10 +40,17 @@ class Robot(Job):
         self.roles = roles.copy()
         self.keyword = keyword
         self.admin = "wxid_bslrmqx7wofq22"
+
+        self.lock = False
         
         self.LOG = logging.getLogger("Robot")
         self.wxid = self.wcf.get_self_wxid()
         self.allContacts = self.getAllContacts()
+
+        self.alarm = WeatherAlarm()
+        self.ALAEM = ["18945565606@chatroom"]
+
+        self.onEveryMinutes(10, self.weatherAlarm)
 
         # if ChatType.is_in_chat_types(chat_type):
         #     if chat_type == ChatType.TIGER_BOT.value and TigerBot.value_check(self.config.TIGERBOT):
@@ -113,25 +121,25 @@ class Robot(Job):
 
         return status
 
-
     def toChitchat(self, msg: WxMsg) -> bool:
         """闲聊，接入 ChatGPT
         """
         if not self.chat:  # 没接 ChatGPT，固定回复
             rsp = ""
         else:  # 接了 ChatGPT，智能回复
-            q = re.sub(r"@.*?[\u2005|\s]", "", msg.content).replace(" ", "")
+            q = re.sub(r"@.*?[\u2005|\s]", "", msg.content)
             if q == "天气":
                 rsp = weather(self.roles.get(self.keyword, "default")["special_error"])
                 # wea = weather() + "\n根据天气信息写一份该天的天气简报，要求语言简洁，并给出适当的建议，建议中不要提及主体，保持之前设定的说话方式"
                 # rsp = self.chat.get_answer(wea, (msg.roomid if msg.from_group() else msg.sender))
-            elif re.match("ddl\n(\d{10})\n(.+)", q) != None:
-                mat = re.match("ddl\n(\d{10})\n(.+)", q)
-                rsp = deadline(mat.group(1),
-                    mat.group(2),
-                    self.roles.get(self.keyword, "default")["special_ddl"],
-                    self.roles.get(self.keyword, "default")["special_error"]
-                )
+            # ddl功能暂时锁定
+            # elif re.match("ddl\n(\d{10})\n(.+)", q) != None:
+            #     mat = re.match("ddl\n(\d{10})\n(.+)", q)
+            #     rsp = deadline(mat.group(1),
+            #         mat.group(2),
+            #         self.roles.get(self.keyword, "default")["special_ddl"],
+            #         self.roles.get(self.keyword, "default")["special_error"]
+            #     )
             else:
                 rsp = self.chat.get_answer(q, (msg.roomid if msg.from_group() else msg.sender))
 
@@ -183,7 +191,9 @@ class Robot(Job):
             # 让配置加载更灵活，自己可以更新配置。也可以利用定时任务更新。
             if not msg.from_group():
                 if msg.sender == self.admin:
-                    if msg.content == "$\\clear$":
+                    if msg.content == r"$\lock$":
+                        self.lock = not self.lock
+                    elif msg.content == r"$\reset$":
                         self.chat = ZhiPu(
                             self.config.ZhiPu,
                             self.roles.get(self.keyword, "default")
@@ -200,7 +210,8 @@ class Robot(Job):
                     else:
                         self.toChitchat(msg)
             else:
-                self.toChitchat(msg)  # 闲聊
+                if not self.lock:
+                    self.toChitchat(msg)  # 闲聊
 
 
     def onMsg(self, msg: WxMsg) -> int:
@@ -298,3 +309,13 @@ class Robot(Job):
         news = News().get_important_news()
         for r in receivers:
             self.sendTextMsg(news, r)
+
+    def weatherAlarm(self) -> None:
+        msg = self.alarm.update(tick=10, special_error=self.roles.get(self.keyword, "default")["special_error"])
+        receivers = self.ALARM
+        if not receivers:
+            return
+
+        if msg != "error" and msg != "":
+            for r in receivers:
+                self.sendTextMsg(msg, r)

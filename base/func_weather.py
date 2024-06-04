@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import os
-
 import re
 import json
 import requests as req
@@ -38,7 +36,7 @@ def weather(special_error: str) -> str:
 
         data_now = dict_now["data"]["now"]
 
-        date_group_now = re.match(pattern=r"(\d\d\d\d)/(\d\d)/(\d\d) (\d\d:\d\d)", string=dict_now["data"]["lastUpdate"])
+        date_group_now = re.match(pattern=r"(\d{4})/(\d{2})/(\d{2}) (\d{2}:\d{2})", string=dict_now["data"]["lastUpdate"])
         year_now = date_group_now.group(1)
         month_now = date_group_now.group(2).lstrip("0")
         day_now = date_group_now.group(3).lstrip("0")
