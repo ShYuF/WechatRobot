@@ -11,6 +11,7 @@ class WeatherAlarm:
     '''
 
     TEST = "测试"
+
     # interval: int = 10, 检查间隔时间，默认为10分钟
     def __init__(self, interval: int = 10):
         self.id_list = []
@@ -41,14 +42,14 @@ class WeatherAlarm:
         report = ""
         try:
             r = req.get(url=url, headers=headers) 
-            dict = json.loads(r.text)
+            dic = json.loads(r.text)
             r.close()
 
-            msg = dict["msg"]
+            msg = dic["msg"]
             if msg != "success":
-                return special_error
+                return "error"
             
-            data_list = dict["data"]
+            data_list = dic["data"]
             
             for data in data_list:
                 title = data["title"]
@@ -78,7 +79,7 @@ class WeatherAlarm:
                 
                 report += area + "天气预警\n" + "发布时间：" + effective + "\n" + description
         except:
-            report = special_error
+            report = "error"
         finally:
             return report
         

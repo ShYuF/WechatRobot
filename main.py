@@ -13,7 +13,6 @@ from wcferry import Wcf
 
 from base.func_weather import weather
 
-
 role_info_path = r"info\roles.yaml"
 file = open(role_info_path, "r", encoding="utf-8")
 roles = yaml.safe_load(file.read())
@@ -30,6 +29,16 @@ def weather_report(robot: Robot) -> None:
         robot.sendTextMsg(report, r)
         # robot.sendTextMsg(report, r, "notify@all")   # 发送消息并@所有人
 
+
+def weatherAlarm(robot: Robot) -> None:
+    msg = robot.alarm.update(tick=10, special_error=robot.roles.get(robot.keyword, "default")["special_error"])
+    receivers = robot.ALARM
+    if not receivers:
+        return
+
+    if msg != "error" and msg != "":
+        for r in receivers:
+            robot.sendTextMsg(msg, r)
 
 def main():
     config = Config()
@@ -50,6 +59,7 @@ def main():
 
     # 每天 7 点发送天气预报
     robot.onEveryTime("07:00", weather_report, robot=robot)
+    robot.onEveryMinutes(10, task=weatherAlarm, robot=robot)
 
     # 每天 7:30 发送新闻
     # robot.onEveryTime("07:30", robot.newsReport)

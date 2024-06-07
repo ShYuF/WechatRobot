@@ -48,9 +48,8 @@ class Robot(Job):
         self.allContacts = self.getAllContacts()
 
         self.alarm = WeatherAlarm()
-        self.ALAEM = ["18945565606@chatroom"]
+        self.ALARM = ["18945565606@chatroom"]
 
-        self.onEveryMinutes(10, self.weatherAlarm)
 
         # if ChatType.is_in_chat_types(chat_type):
         #     if chat_type == ChatType.TIGER_BOT.value and TigerBot.value_check(self.config.TIGERBOT):
@@ -309,13 +308,3 @@ class Robot(Job):
         news = News().get_important_news()
         for r in receivers:
             self.sendTextMsg(news, r)
-
-    def weatherAlarm(self) -> None:
-        msg = self.alarm.update(tick=10, special_error=self.roles.get(self.keyword, "default")["special_error"])
-        receivers = self.ALARM
-        if not receivers:
-            return
-
-        if msg != "error" and msg != "":
-            for r in receivers:
-                self.sendTextMsg(msg, r)
