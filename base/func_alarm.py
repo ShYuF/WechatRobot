@@ -77,7 +77,7 @@ class WeatherAlarm:
                 # 预警内容
                 description = data["description"]
                 
-                report += area + "天气预警\n" + "发布时间：" + effective + "\n" + description
+                report += "发布时间：" + effective + "\n" + description + "\n"
         except:
             report = "error"
         finally:
