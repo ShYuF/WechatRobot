@@ -81,6 +81,7 @@ class WeatherAlarm:
         except:
             report = "error"
         finally:
+            report = report.rstrip("\n")
             return report
         
     # 检查预警
