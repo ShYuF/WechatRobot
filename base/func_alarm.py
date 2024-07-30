@@ -80,6 +80,7 @@ class WeatherAlarm:
                 report += "发布时间：" + effective + "\n" + description + "\n"
         except:
             report = "error"
+            print("查询失败")
         finally:
             report = report.rstrip("\n")
             return report
@@ -91,4 +92,4 @@ class WeatherAlarm:
 
 # if __name__ == "__main__":
 #     alarm = WeatherAlarm()
-#     print(alarm.test(r"怀柔区"))
+#     print(alarm.test(WeatherAlarm.TEST))
