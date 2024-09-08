@@ -11,7 +11,7 @@ from constants import ChatType
 from robot import Robot, __version__
 from wcferry import Wcf
 
-from base.func_weather import weather
+#from base.func_weather import weather
 
 role_info_path = r"info\roles.yaml"
 file = open(role_info_path, "r", encoding="utf-8")
@@ -19,15 +19,15 @@ roles = yaml.safe_load(file.read())
 file.close()
 
 
-def weather_report(robot: Robot) -> None:
-    # 获取接收人
-    receivers = [robot.admin]
+# def weather_report(robot: Robot) -> None:
+#     # 获取接收人
+#     receivers = [robot.admin]
 
-    report = weather(robot.roles[robot.keyword]["special_error"])
+#     report = weather(robot.roles[robot.keyword]["special_error"])
 
-    for r in receivers:
-        robot.sendTextMsg(report, r)
-        # robot.sendTextMsg(report, r, "notify@all")   # 发送消息并@所有人
+#     for r in receivers:
+#         robot.sendTextMsg(report, r)
+#         # robot.sendTextMsg(report, r, "notify@all")   # 发送消息并@所有人
 
 
 def weatherAlarm(robot: Robot) -> None:
@@ -58,7 +58,7 @@ def main():
     robot.enableReceivingMsg()  # 加队列
 
     # 每天 7 点发送天气预报
-    robot.onEveryTime("07:00", weather_report, robot=robot)
+    #robot.onEveryTime("07:00", weather_report, robot=robot)
     robot.onEveryMinutes(10, task=weatherAlarm, robot=robot)
 
     # 每天 7:30 发送新闻

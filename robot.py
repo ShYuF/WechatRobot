@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import logging
+import os
 import re
 import time
+import yaml
+import json
 import xml.etree.ElementTree as ET
 from queue import Empty
 from threading import Thread
@@ -22,7 +25,7 @@ from constants import ChatType
 from job_mgmt import Job
 
 import random
-from base.func_weather import weather
+from base.func_weather import get_current_weather
 from base.func_deadline import deadline
 from base.func_alarm import WeatherAlarm
 
@@ -39,7 +42,8 @@ class Robot(Job):
 
         self.roles = roles.copy()
         self.keyword = keyword
-        self.admin = "wxid_bslrmqx7wofq22"
+        self.admin = ""
+        self.ALARM = []
 
         self.lock = False
         
@@ -47,26 +51,123 @@ class Robot(Job):
         self.wxid = self.wcf.get_self_wxid()
         self.allContacts = self.getAllContacts()
 
+        with open(r"info\info.yaml", "r", encoding="utf-8") as file:
+            info = yaml.safe_load(file.read())
+            self.admin = info["admin"]
+            self.ALARM = info["alarm"]
+            file.close()
+
         self.alarm = WeatherAlarm()
-        self.ALARM = ["18945565606@chatroom"]
+        
 
+        self.cmdMode = False
+        self.emojiMode = False
+        self.queryMode = False
 
-        # if ChatType.is_in_chat_types(chat_type):
-        #     if chat_type == ChatType.TIGER_BOT.value and TigerBot.value_check(self.config.TIGERBOT):
-        #         self.chat = TigerBot(self.config.TIGERBOT)
-        #     elif chat_type == ChatType.CHATGPT.value and ChatGPT.value_check(self.config.CHATGPT):
-        #         self.chat = ChatGPT(self.config.CHATGPT)
-        #     elif chat_type == ChatType.XINGHUO_WEB.value and XinghuoWeb.value_check(self.config.XINGHUO_WEB):
-        #         self.chat = XinghuoWeb(self.config.XINGHUO_WEB)
-        #     elif chat_type == ChatType.ZhiPu.value and ZhiPu.value_check(self.config.ZHIPU):
-        #         self.chat = ZhiPu(self.config.ZHIPU, role)
-        #     elif chat_type == ChatType.CHATGLM.value and ChatGLM.value_check(self.config.CHATGLM):
-        #         self.chat = ChatGLM(self.config.CHATGLM)
-        #     elif chat_type == ChatType.BardAssistant.value and BardAssistant.value_check(self.config.BardAssistant):
-        #         self.chat = BardAssistant(self.config.BardAssistant)
-        #     else:
-        #         self.LOG.warning("未配置模型")
-        #         self.chat = None
+        self.todoList: list = []
+
+        with open(r"emoji\emoji.yaml", "r", encoding="utf-8") as file:
+            emoji_info = yaml.safe_load(file.read())
+            file.close()
+
+        # print(emoji_info)
+
+        self.local_path = os.getcwd()
+        self.emoji_list: list = []
+        for fileType in emoji_info["emojiType"]:
+            if len(emoji_info[fileType]) > 0:
+                tmp = [self.local_path + f"\emoji\{file}.{fileType}" for file in emoji_info[fileType]]
+                self.emoji_list.extend(tmp)
+        # print(self.emoji_list)
+
+        def help(): self.sendTextMsg(
+                    """命令列表:
+                    \r$cmd: 进入命令模式（在命令模式下无效）
+                    \r$exit: 退出命令模式
+                    \r$lock: 锁定/解锁机器人
+                    \r$reset: 重置机器人
+                    \r$switch [role]: 切换角色
+                    \r$emoji: 进入/退出表情模式
+                    \r$emoji [-test]: 测试表情
+                    \r$todo [-add] [content] / [-show] / [-del] [index]: 添加/查看/删除Todo List内容
+                    \r$query: 开启/关闭查询功能""", self.admin)
+        def lock(): 
+            self.lock = not self.lock
+            if self.lock:
+                self.sendTextMsg("已锁定", self.admin)
+            else:
+                self.sendTextMsg("已解锁", self.admin)
+        def reset(): 
+            self.chat = ZhiPu(self.config.ZhiPu, self.roles.get(self.keyword, "default"))
+            self.sendTextMsg(self.roles.get(self.keyword, "default")["greet"], self.admin)
+        def switch(role: str = ""): 
+            self.keyword = role if role in self.roles.keys() else "default"
+            self.chat = ZhiPu(self.config.ZhiPu, self.roles.get(self.keyword, "default"))
+            self.sendTextMsg(self.roles.get(self.keyword, "default")["greet"], self.admin)
+        def emoji():
+            self.emojiMode = not self.emojiMode
+            if self.emojiMode:
+                self.sendTextMsg("已开启表情模式", self.admin)
+            else:
+                self.sendTextMsg("已关闭表情模式", self.admin)
+        def emojiTest():
+            self.sendTextMsg("测试表情", self.admin)
+            for emoji in self.emoji_list:
+                self.wcf.send_emotion(emoji, self.admin)
+        def todo(cmd: str = "show", args: str | int | None = None):
+            self.todoList.clear()
+            file = open(r"info\todo.json", "r", encoding="utf-8")
+            self.todoList = json.load(file)["Todo"]
+            file.close()
+            if cmd == "add":
+                if args == None:
+                    self.sendTextMsg("请输入内容", self.admin)
+                    return
+                self.todoList.append(args)
+                file = open(r"info\todo.json", "w", encoding="utf-8")
+                json.dump({"Todo": self.todoList}, file, ensure_ascii=False)
+                file.close()
+                self.sendTextMsg(f"已添加", self.admin)
+            elif cmd == "show":
+                msg = "Todo List\n----------------\n"
+                if len(self.todoList) == 0:
+                    msg += "当前无事项\n"
+                else:
+                    for i, todo in enumerate(self.todoList):
+                        msg += f"{i + 1}. {todo}\n"
+                msg = msg.strip()
+                self.sendTextMsg(msg, self.admin)
+            elif cmd == "del":
+                if args == None:
+                    self.sendTextMsg("请输入序号", self.admin)
+                    return
+                if args > len(self.todoList) or args <= 0:
+                    self.sendTextMsg("无效序号", self.admin)
+                    return
+                self.todoList.pop(args - 1)
+                file = open(r"info\todo.json", "w", encoding="utf-8")
+                json.dump({"Todo": self.todoList}, file, ensure_ascii=False)
+                file.close()
+                self.sendTextMsg(f"已删除", self.admin)
+            else:
+                self.sendTextMsg("无效命令", self.admin)
+        def query():
+            self.queryMode = not self.queryMode
+            if self.queryMode:
+                self.sendTextMsg("已开启查询功能", self.admin)
+            else:
+                self.sendTextMsg("已关闭查询功能", self.admin)
+
+        self.cmd = {
+            r"^\$help$": help,
+            r"^\$lock$": lock,
+            r"^\$reset$": reset,
+            r"^\$switch (\w+)$": switch,
+            r"^\$emoji$": emoji,
+            r"^\$emoji -test$": emojiTest,
+            r"^\$todo -(?:(add) (.+)|(show)|(del) (\d+))$": todo,
+            r"^\$query$": query
+        }
 
         self.chat = ZhiPu(
             self.config.ZhiPu,
@@ -120,17 +221,25 @@ class Robot(Job):
 
         return status
 
+    def getRandomEmoji(self) -> str:
+        emoji = random.choice(self.emoji_list)
+        return emoji
+
     def toChitchat(self, msg: WxMsg) -> bool:
-        """闲聊，接入 ChatGPT
+        """闲聊
         """
+        #at: str = ""
         if not self.chat:  # 没接 ChatGPT，固定回复
             rsp = ""
         else:  # 接了 ChatGPT，智能回复
-            q = re.sub(r"@.*?[\u2005|\s]", "", msg.content)
-            if q == "天气":
-                rsp = weather(self.roles.get(self.keyword, "default")["special_error"])
-                # wea = weather() + "\n根据天气信息写一份该天的天气简报，要求语言简洁，并给出适当的建议，建议中不要提及主体，保持之前设定的说话方式"
-                # rsp = self.chat.get_answer(wea, (msg.roomid if msg.from_group() else msg.sender))
+            q = re.sub(r"@.*?[\u2005|\s]", "", msg.content).strip()
+            weather_pattern = r"^\$q (.+)天气$"
+            if self.queryMode and re.match(weather_pattern, q) != None:
+                    location = re.match(weather_pattern, q).group(1)
+                    rsp = get_current_weather(
+                        location=location,
+                        special_error=self.roles.get(self.keyword, "default")["special_error"]
+                    )
             # ddl功能暂时锁定
             # elif re.match("ddl\n(\d{10})\n(.+)", q) != None:
             #     mat = re.match("ddl\n(\d{10})\n(.+)", q)
@@ -140,14 +249,19 @@ class Robot(Job):
             #         self.roles.get(self.keyword, "default")["special_error"]
             #     )
             else:
+                #at = msg.sender if msg.is_at(self.wxid) else ""
                 rsp = self.chat.get_answer(q, (msg.roomid if msg.from_group() else msg.sender))
 
         if rsp:
             if msg.from_group():
                 # self.sendTextMsg(rsp, msg.roomid, msg.sender)
                 self.sendTextMsg(rsp, msg.roomid)
+                if self.emojiMode:
+                    self.wcf.send_emotion(self.getRandomEmoji(), msg.roomid)
             else:
                 self.sendTextMsg(rsp, msg.sender)
+                if self.emojiMode:
+                    self.wcf.send_emotion(self.getRandomEmoji(), msg.sender)
 
             return True
         else:
@@ -190,22 +304,32 @@ class Robot(Job):
             # 让配置加载更灵活，自己可以更新配置。也可以利用定时任务更新。
             if not msg.from_group():
                 if msg.sender == self.admin:
-                    if msg.content == r"$\lock$":
-                        self.lock = not self.lock
-                    elif msg.content == r"$\reset$":
-                        self.chat = ZhiPu(
-                            self.config.ZhiPu,
-                            self.roles.get(self.keyword, "default")
-                        )
-                    elif re.match(r"\$\\switch (\w+)\$", msg.content) != None:
-                        self.keyword = re.match(r"\$\\switch (\w+)\$", msg.content).group(1) \
-                            if re.match(r"\$\\switch (\w+)\$", msg.content).group(1) in self.roles.keys() \
-                            else "default"
-                        self.chat = ZhiPu(
-                            self.config.ZhiPu,
-                            self.roles.get(self.keyword, "default")
-                        )
-                        self.sendTextMsg(self.roles.get(self.keyword, "default")["greet"], self.admin)
+                    if self.cmdMode == False and msg.content == r"$cmd":
+                        self.cmdMode = True
+                        self.sendTextMsg("进入命令模式", self.admin)
+                    elif self.cmdMode == True and msg.content == r"$exit":
+                        self.cmdMode = False
+                        self.sendTextMsg("退出命令模式", self.admin)
+                    elif self.cmdMode == True:
+                        flag = False
+                        for key, value in self.cmd.items():
+                            if re.match(key, msg.content) != None:
+                                flag = True
+                                match = re.match(key, msg.content).groups()
+                                if len(match) > 0:
+                                    if len(match) == 5 and (match[0] == "add" or match[2] == "show" or match[3] == "del"):
+                                        if match[0] == "add":
+                                            value(*match[0:2])
+                                        elif match[2] == "show":
+                                            value(match[2])
+                                        elif match[3] == "del":
+                                            value(match[3], int(match[4]))
+                                    else:
+                                        value(*match)
+                                else:
+                                    value()
+                        if not flag:
+                            self.sendTextMsg("无效命令，输入$help以获取可用命令", self.admin)                        
                     else:
                         self.toChitchat(msg)
             else:
@@ -262,9 +386,10 @@ class Robot(Job):
         if ats == "":
             self.LOG.info(f"To {receiver}: {msg}")
             self.wcf.send_text(f"{msg}", receiver, at_list)
+            # self.wcf.send_emotion("")
         else:
             self.LOG.info(f"To {receiver}: {ats}\r{msg}")
-            self.wcf.send_text(f"{ats}\n\n{msg}", receiver, at_list)
+            self.wcf.send_text(f"{ats} {msg}", receiver, at_list)
 
     def getAllContacts(self) -> dict:
         """
